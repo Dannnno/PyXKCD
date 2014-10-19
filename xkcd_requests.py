@@ -26,8 +26,8 @@ If not, see <http://opensource.org/licenses/MIT>
 import datetime
 import json
 import requests
-import sys
-
+import shutil
+import subprocess
 
 # Sample json format of comic 614
 #
@@ -48,22 +48,55 @@ import sys
 
 class Comic(object):
     
-    def __init__(self, image, title, number, date, alt, 
-                 transcript=None, safe_title=None):
+    def __init__(self, image, title, number, date, alt, **kwargs):
         self.image = image
         self.url = ''.join(['http://www.xkcd.com/', str(number)])
         self.title = title
         self.comic_number = number
-        self.date = date#datetime.datetime.strptime(date, '%Y/%m/%d')
+        self.date = datetime.datetime.strptime(date, '%Y/%m/%d')
         self.alt_text = alt
-        if not (transcript is None):
-            self.transcript = transcript
-        else:
-            self.transcript = "Not available for this comic"
-        if not (safe_title is None):
-            self.safe_title = safe_title
-        else:
-            self.safe_title = title
+        
+        ## Keyword values
+        self.transcript = None
+        self.link = None
+        self.safe_title = title
+        self.news = None
+        for key, value in kwargs.iteritems():
+            self.__dict__[key] = value
+        self.safe_title = self.safe_title.replace(' ', '_')
+            
+    def display_comic(self):
+        image = requests.get(self.image, stream=True)
+        with open(''.join([
+                            self.safe_title,
+                            '.png'
+                           ]), 'wb') as out_file:
+            shutil.copyfileobj(image.raw, out_file)
+        del image
+        subprocess.check_call(self.safe_title+'.png', shell=True)
+        print self
+        print "Alt text:", self.alt_text
+            
+    def __str__(self):
+        if self.transcript is not None:
+            return self.transcript
+        return "Comic number {}: {}".format(self.comic_number, self.title)
+        
+    def __repr__(self): return str(self)
+    
+    def __unicode__(self): return unicode(str(self))
+
+
+class What_If(object):
+    
+    def __init__(self):
+        raise NotImplementedError
+        
+    
+class Explain_Comic(object):
+    
+    def __init__(self):
+        raise NotImplementedError
 
 
 def get_newest_comic():
@@ -93,29 +126,24 @@ def parse_transcript(transcript):
     lines = transcript.split('\n')
     transcript = {}
     for line in lines:
-        if line.startswith('[[') and line.endswith(']]'):
-            print 'Description'
-        elif line.startswith('{{') and line.endswith('}}'):
-            print 'Title'
-        else:
-            print 'Spoken words'
+        if line:
+            if line.startswith('[[') and line.endswith(']]'):
+                print 'Description', line[2:-2]
+            elif line.startswith('{{') and line.endswith('}}'):
+                print line[2:-2]
+            else:
+                print 'Spoken words', line
 
 
 def json_to_comic(d):
-    trans = (d['transcript'] 
-             if d['transcript']
-             else None)
-    safe = (d['safe_title']
-            if d['safe_title']
-            else None)
+    image, title, number, year, month, day, alt_text = \
+              map(d.pop, ['img', 'title', 'num', 'year', 'month', 'day', 'alt'])
+    
     return Comic(
-                  d['img'], d['title'], d['num'], '/'.join([d['year'],
-                                                            d['month'],
-                                                            d['day']
-                                                           ]),
-                  d['alt'], transcript=trans, safe_title=safe)
-                            
+                  image, title, number, '/'.join([year, month, day]), alt_text,
+                  **{key:value for key, value in d.iteritems() if value}
+                 )          
 
 if __name__ == "__main__":
-    print get_newest_comic()
-    
+    newest = get_newest_comic()
+    newest.display_comic()
