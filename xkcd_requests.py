@@ -25,9 +25,13 @@ If not, see <http://opensource.org/licenses/MIT>
 
 import datetime
 import json
+import PIL
 import requests
-import shutil
-import subprocess
+import Tkinter as tk
+try:
+    import cStringIO as IO
+except ImportError:
+    import StringIO as IO
 
 # Sample json format of comic 614
 #
@@ -49,7 +53,7 @@ import subprocess
 class Comic(object):
     
     def __init__(self, image, title, number, date, alt, **kwargs):
-        self.image = image
+        self.img_url = image
         self.url = ''.join(['http://www.xkcd.com/', str(number)])
         self.title = title
         self.comic_number = number
@@ -66,16 +70,19 @@ class Comic(object):
         self.safe_title = self.safe_title.replace(' ', '_')
             
     def display_comic(self):
-        image = requests.get(self.image, stream=True)
-        with open(''.join([
-                            self.safe_title,
-                            '.png'
-                           ]), 'wb') as out_file:
-            shutil.copyfileobj(image.raw, out_file)
-        del image
-        subprocess.check_call(self.safe_title+'.png', shell=True)
-        print self
-        print "Alt text:", self.alt_text
+        image = requests.get(self.img_url)
+        
+        top = tk.Toplevel()
+        top.geometry('1000x1000')
+        
+        canvas = tk.Canvas(top, width=999, height=999)
+        canvas.pack()
+        
+        pilImage = PIL.Image.open(IO.StringIO(image.content))
+        mimage = PIL.ImageTk.PhotoImage(pilImage)
+        canvas.create_image(400,400,image=mimage)
+        
+        top.mainloop()
             
     def __str__(self):
         if self.transcript is not None:
